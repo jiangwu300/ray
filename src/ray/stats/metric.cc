@@ -98,8 +98,31 @@ Metric::Metric(const std::string &name,
           ". Metric names can only contain letters, numbers, _, and :. "
           "Metric names cannot start with numbers. Metric name cannot be "
           "empty.");
+  if (StatsConfig::instance().IsStatsDisabled()) {
+    return;
+  }
+
   for (const auto &key : tag_keys) {
     tag_keys_.push_back(opencensus::tags::TagKey::Register(key));
+  }
+
+  if (::RayConfig::instance().experimental_enable_open_telemetry_on_core()) {
+    RegisterOpenTelemetryMetric();
+    return;
+  }
+
+  if (measure_ == nullptr) {
+    // Measure could be registered before, so we try to get it first.
+    MeasureDouble registered_measure =
+        opencensus::stats::MeasureRegistry::GetMeasureDoubleByName(name_);
+
+    if (registered_measure.IsValid()) {
+      measure_ = std::make_unique<MeasureDouble>(MeasureDouble(registered_measure));
+    } else {
+      measure_ = std::make_unique<MeasureDouble>(
+          MeasureDouble::Register(name_, description_, unit_));
+    }
+    RegisterView();
   }
 }
 
@@ -114,34 +137,18 @@ void Metric::Record(double value, TagsType tags) {
   }
 
   if (::RayConfig::instance().experimental_enable_open_telemetry_on_core()) {
-    // Register the metric if it hasn't been registered yet; otherwise, this is a no-op.
-    // We defer metric registration until the first time it's recorded, rather than during
-    // construction, to avoid issues with static initialization order. Specifically, our
-    // internal Metric objects (see metric_defs.h) are declared as static, and
-    // constructing another static object within their constructor can lead to crashes at
-    // program exit due to unpredictable destruction order.
-    //
-    // Once these internal Metric objects are migrated to use DEFINE_stats, we can
-    // safely move the registration logic to the constructor. See
-    // https://github.com/ray-project/ray/issues/54538 for the backlog of Ray metric infra
-    // improvements.
-    //
-    // This function is thread-safe.
-    RegisterOpenTelemetryMetric();
     // Collect tags from both the metric-specific tags and the global tags.
     absl::flat_hash_map<std::string, std::string> open_telemetry_tags;
     std::unordered_set<std::string> tag_keys_set;
     for (const auto &tag_key : tag_keys_) {
       tag_keys_set.insert(tag_key.name());
     }
-    // Insert metric-specific tags that match the expected keys.
     for (const auto &tag : tags) {
       const std::string &key = tag.first.name();
       if (tag_keys_set.count(key)) {
         open_telemetry_tags[key] = tag.second;
       }
     }
-    // Add global tags, overwriting any existing tag keys.
     for (const auto &tag : StatsConfig::instance().GetGlobalTags()) {
       open_telemetry_tags[tag.first.name()] = tag.second;
     }
@@ -151,22 +158,6 @@ void Metric::Record(double value, TagsType tags) {
     return;
   }
 
-  absl::MutexLock lock(&registration_mutex_);
-  if (measure_ == nullptr) {
-    // Measure could be registered before, so we try to get it first.
-    MeasureDouble registered_measure =
-        opencensus::stats::MeasureRegistry::GetMeasureDoubleByName(name_);
-
-    if (registered_measure.IsValid()) {
-      measure_ = std::make_unique<MeasureDouble>(MeasureDouble(registered_measure));
-    } else {
-      measure_ = std::make_unique<MeasureDouble>(
-          MeasureDouble::Register(name_, description_, unit_));
-    }
-    RegisterView();
-  }
-
-  // Do record.
   TagsType combined_tags(std::move(tags));
   combined_tags.insert(std::end(combined_tags),
                        std::begin(StatsConfig::instance().GetGlobalTags()),
