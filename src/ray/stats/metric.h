@@ -142,6 +142,7 @@ class Metric {
  protected:
   virtual void RegisterView() = 0;
   virtual void RegisterOpenTelemetryMetric() = 0;
+  void RegisterMetric();
 
  protected:
   std::string name_;
@@ -163,7 +164,9 @@ class Gauge : public Metric {
         const std::string &description,
         const std::string &unit,
         const std::vector<std::string> &tag_keys = {})
-      : Metric(name, description, unit, tag_keys) {}
+      : Metric(name, description, unit, tag_keys) {
+    RegisterMetric();
+  }
 
  private:
   void RegisterView() override;
@@ -178,9 +181,12 @@ class Histogram : public Metric {
             const std::string &unit,
             const std::vector<double> &boundaries,
             const std::vector<std::string> &tag_keys = {})
-      : Metric(name, description, unit, tag_keys), boundaries_(boundaries) {}
+      : Metric(name, description, unit, tag_keys), boundaries_(boundaries) {
+    RegisterMetric();
+  }
 
  private:
+  void RegisterMetric();
   void RegisterView() override;
   void RegisterOpenTelemetryMetric() override;
 
@@ -195,7 +201,9 @@ class Count : public Metric {
         const std::string &description,
         const std::string &unit,
         const std::vector<std::string> &tag_keys = {})
-      : Metric(name, description, unit, tag_keys) {}
+      : Metric(name, description, unit, tag_keys) {
+    RegisterMetric();
+  }
 
  private:
   void RegisterView() override;
@@ -209,7 +217,9 @@ class Sum : public Metric {
       const std::string &description,
       const std::string &unit,
       const std::vector<std::string> &tag_keys = {})
-      : Metric(name, description, unit, tag_keys) {}
+      : Metric(name, description, unit, tag_keys) {
+    RegisterMetric();
+  }
 
  private:
   void RegisterView() override;

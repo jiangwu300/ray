@@ -106,23 +106,16 @@ Metric::Metric(const std::string &name,
     tag_keys_.push_back(opencensus::tags::TagKey::Register(key));
   }
 
-  if (::RayConfig::instance().experimental_enable_open_telemetry_on_core()) {
-    RegisterOpenTelemetryMetric();
-    return;
-  }
-
-  if (measure_ == nullptr) {
-    // Measure could be registered before, so we try to get it first.
+  if (!::RayConfig::instance().experimental_enable_open_telemetry_on_core()) {
+    absl::MutexLock lock(&registration_mutex_);
     MeasureDouble registered_measure =
         opencensus::stats::MeasureRegistry::GetMeasureDoubleByName(name_);
-
     if (registered_measure.IsValid()) {
       measure_ = std::make_unique<MeasureDouble>(MeasureDouble(registered_measure));
     } else {
       measure_ = std::make_unique<MeasureDouble>(
           MeasureDouble::Register(name_, description_, unit_));
     }
-    RegisterView();
   }
 }
 
@@ -143,12 +136,14 @@ void Metric::Record(double value, TagsType tags) {
     for (const auto &tag_key : tag_keys_) {
       tag_keys_set.insert(tag_key.name());
     }
+    // Insert metric-specific tags that match the expected keys.
     for (const auto &tag : tags) {
       const std::string &key = tag.first.name();
       if (tag_keys_set.count(key)) {
         open_telemetry_tags[key] = tag.second;
       }
     }
+    // Add global tags, overwriting any existing tag keys.
     for (const auto &tag : StatsConfig::instance().GetGlobalTags()) {
       open_telemetry_tags[tag.first.name()] = tag.second;
     }
@@ -184,6 +179,17 @@ void Metric::Record(double value, std::unordered_map<std::string, std::string> t
                                       std::move(tag.second));
   });
   Record(value, std::move(tags_pair_vec));
+}
+
+void Metric::RegisterMetric() {
+  if (StatsConfig::instance().IsStatsDisabled()) {
+    return;
+  }
+  if (::RayConfig::instance().experimental_enable_open_telemetry_on_core()) {
+    RegisterOpenTelemetryMetric();
+  } else {
+    RegisterView();
+  }
 }
 
 Metric::~Metric() { opencensus::stats::StatsExporter::RemoveView(name_); }
