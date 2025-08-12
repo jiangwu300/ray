@@ -11,8 +11,8 @@ steps:
     depends_on:
       - manylinux
       - forge
-      - raycudabase
-      - raycpubase
+      - raycudabaseextra
+      - raycpubaseextra
     matrix:
       setup:
         python:
