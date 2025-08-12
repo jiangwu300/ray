@@ -463,12 +463,16 @@ class vLLMEngineStageUDF(StatefulStageUDF):
             logger.info("Max pending requests is set to %d", self.max_pending_requests)
 
         # Download the model if needed.
-        model_source = download_model_files(
-            model_id=self.model,
-            mirror_config=None,
-            download_model=NodeModelDownloadable.MODEL_AND_TOKENIZER,
-            download_extra_files=False,
-        )
+        # if we have runai_streamer turned on, we don't need to download the files.
+        if ("load_format" in self.engine_kwargs and self.engine_kwargs["load_format"] == "runai_streamer"):
+            model_source=self.model
+        else:
+            model_source = download_model_files(
+                model_id=self.model,
+                mirror_config=None,
+                download_model=NodeModelDownloadable.MODEL_AND_TOKENIZER,
+                download_extra_files=False,
+            )
 
         # Create an LLM engine.
         self.llm = vLLMEngineWrapper(

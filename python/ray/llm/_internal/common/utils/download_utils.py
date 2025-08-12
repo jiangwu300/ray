@@ -1,5 +1,6 @@
 import enum
 import os
+import subprocess
 from pathlib import Path
 from typing import List, Optional
 
@@ -13,6 +14,7 @@ from ray.llm._internal.common.utils.cloud_utils import (
     is_remote_path,
 )
 from ray.llm._internal.common.utils.import_utils import try_import
+from urllib.parse import urlparse
 
 torch = try_import("torch")
 
@@ -196,6 +198,44 @@ class CloudModelDownloader(CloudModelAccessor):
                 pass
         return paths
 
+def download_non_safetensor_files(s3_uri: str, local_dir: str):
+    """
+    Download all non-`.safetensors` files from an S3 path into a local directory using s5cmd.
+    Skips folders and files ending in `.safetensors`.
+    """
+    os.makedirs(local_dir, exist_ok=True)
+    parsed = urlparse(s3_uri)
+    bucket = parsed.netloc
+    prefix = parsed.path.lstrip("/").rstrip("/") + "/"
+
+    s3_prefix = f"s3://{bucket}/{prefix}"
+
+    # List all objects under the prefix
+    try:
+        result = subprocess.run(
+            ["s5cmd", "ls", s3_prefix],
+            capture_output=True,
+            check=True,
+            text=True,
+        )
+        lines = result.stdout.strip().splitlines()
+
+        # Extract full S3 keys, filtering out .safetensors and folders
+        for line in lines:
+            parts = line.strip().split()
+            if len(parts) < 4:
+                continue
+            key = parts[-1]
+            if key.endswith(".safetensors") or key.endswith("/"):
+                continue
+
+            full_s3_path = f"{s3_prefix}{key}"
+            print(f"📥 Downloading {full_s3_path} → {local_dir}")
+            subprocess.run(["s5cmd", "cp", full_s3_path, local_dir], check=True)
+
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Failed to list or download from {s3_prefix}: {e}")
+
 
 def _log_download_info(
     *, source: str, download_model: NodeModelDownloadable, download_extra_files: bool
@@ -287,6 +327,9 @@ def download_model_files(
 
     if download_extra_files:
         downloader.get_extra_files()
+
+    if "s3" in model_id:
+        download_non_safetensor_files(model_id, model_path_or_id)
 
     return model_path_or_id
 
