@@ -207,21 +207,25 @@ def build_vllm_engine_processor(
     architectures = getattr(hf_config, "architectures", [])
     architecture = architectures[0] if architectures else DEFAULT_MODEL_ARCHITECTURE
 
-    telemetry_agent = get_or_create_telemetry_agent()
-    telemetry_agent.push_telemetry_report(
-        BatchModelTelemetry(
-            processor_config_name=type(config).__name__,
-            model_architecture=architecture,
-            batch_size=config.batch_size,
-            accelerator_type=config.accelerator_type or DEFAULT_GPU_TYPE,
-            concurrency=config.concurrency,
-            task_type=vLLMTaskType(config.task_type),
-            pipeline_parallel_size=config.engine_kwargs.get(
-                "pipeline_parallel_size", 1
-            ),
-            tensor_parallel_size=config.engine_kwargs.get("tensor_parallel_size", 1),
+    try:
+        telemetry_agent = get_or_create_telemetry_agent()
+        telemetry_agent.push_telemetry_report(
+            BatchModelTelemetry(
+                processor_config_name=type(config).__name__,
+                model_architecture=architecture,
+                batch_size=config.batch_size,
+                accelerator_type=config.accelerator_type or DEFAULT_GPU_TYPE,
+                concurrency=config.concurrency,
+                task_type=vLLMTaskType(config.task_type),
+                pipeline_parallel_size=config.engine_kwargs.get(
+                    "pipeline_parallel_size", 1
+                ),
+                tensor_parallel_size=config.engine_kwargs.get("tensor_parallel_size", 1),
+            )
         )
-    )
+    except Exception as e:
+        # Telemetry should not affect the main logic.
+        print(f"Failed to push telemetry report, skipping: {e}")
 
     processor = Processor(
         config,
