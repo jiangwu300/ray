@@ -188,7 +188,10 @@ def build_vllm_engine_processor(
 
     # We download the config files here so that we can report the underlying architecture to the telemetry system.
     # This should be a lightweight operation.
-    if config.engine_kwargs.get("load_format", None) in ["runai_streamer", "tensorizer"]:
+    if config.engine_kwargs.get("load_format", None) in [
+        "runai_streamer",
+        "tensorizer",
+    ]:
         download_model_mode = NodeModelDownloadable.EXCLUDE_SAFETENSORS
     else:
         download_model_mode = NodeModelDownloadable.TOKENIZER_ONLY
@@ -219,7 +222,9 @@ def build_vllm_engine_processor(
                 pipeline_parallel_size=config.engine_kwargs.get(
                     "pipeline_parallel_size", 1
                 ),
-                tensor_parallel_size=config.engine_kwargs.get("tensor_parallel_size", 1),
+                tensor_parallel_size=config.engine_kwargs.get(
+                    "tensor_parallel_size", 1
+                ),
             )
         )
     except Exception as e:
