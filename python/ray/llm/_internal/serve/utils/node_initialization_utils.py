@@ -24,8 +24,7 @@ def initialize_remote_node(llm_config: LLMConfig) -> Optional[str]:
     engine_config = llm_config.get_engine_config()
 
     engine_kwargs = llm_config.engine_kwargs or {}
-
-    streaming = engine_kwargs.get("load_format", None) in STREAMING_LOAD_FORMATS
+    streaming = engine_kwargs.get("load_format", None) in STREAMING_LOAD_FORMATS 
 
     if streaming:
         download_model_mode = NodeModelDownloadable.EXCLUDE_SAFETENSORS

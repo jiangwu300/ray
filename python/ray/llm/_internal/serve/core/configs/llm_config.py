@@ -26,22 +26,21 @@ from ray.llm._internal.common.utils.cloud_utils import (
     CloudMirrorConfig,
     is_remote_path,
 )
-from ray.llm._internal.common.utils.download_utils import (
-    NodeModelDownloadable,
-    STREAMING_LOAD_FORMATS
-)
+from ray.llm._internal.common.utils.download_utils import NodeModelDownloadable
 from ray.llm._internal.common.utils.import_utils import load_class, try_import
 from ray.llm._internal.serve.constants import (
     DEFAULT_MULTIPLEX_DOWNLOAD_TIMEOUT_S,
     DEFAULT_MULTIPLEX_DOWNLOAD_TRIES,
     MODEL_RESPONSE_BATCH_TIMEOUT_MS,
 )
-from ray.llm._internal.serve.engines.vllm.kv_transfer.factory import (
-    KVConnectorBackendFactory,
+from ray.llm._internal.serve.engines.vllm.kv_transfer import (
+    SUPPORTED_BACKENDS as SUPPORTED_KV_CONNECTOR_BACKENDS,
 )
 from ray.llm._internal.serve.observability.logging import get_logger
 from ray.serve._private.config import DeploymentConfig
-
+from ray.llm._internal.common.utils.download_utils import (
+    STREAMING_LOAD_FORMATS
+)
 
 transformers = try_import("transformers")
 
@@ -457,7 +456,7 @@ class LLMConfig(BaseModelExtended):
         #  initialization step.
         if self._engine_config:
             if self._streaming:
-                self._engine_config.hf_model_id = self._remote_model_path # ensure streaming models use remote path
+                self._engine_config.hf_model_id = self._remote_model_path
             return self._engine_config
 
         if self.llm_engine == LLMEngine.vLLM:
@@ -482,7 +481,6 @@ class LLMConfig(BaseModelExtended):
         This is typically called during engine starts, when certain engine_kwargs
         (e.g., data_parallel_rank) become available.
         """
-        self.engine_kwargs.update(kwargs)
         # engine_config may be created before engine starts, this makes sure
         # the engine_config is updated with the latest engine_kwargs.
         if self._engine_config:
@@ -502,10 +500,12 @@ class LLMConfig(BaseModelExtended):
         if not kv_connector:
             raise ValueError("Connector type is not specified.")
 
-        # 2. Setup the backend using factory
-        kv_connector_backend = KVConnectorBackendFactory.create_backend(
-            kv_connector, self
-        )
+        kv_connector_backend_class = SUPPORTED_KV_CONNECTOR_BACKENDS.get(kv_connector)
+        if not kv_connector_backend_class:
+            raise ValueError(f"Unsupported connector type: {kv_connector}")
+
+        # 2. Setup the backend
+        kv_connector_backend = kv_connector_backend_class(self)
         kv_connector_backend.setup()
 
 
