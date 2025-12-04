@@ -276,7 +276,7 @@ class vLLMEngineWrapper:
         if self.task_type == vLLMTaskType.GENERATE:
             sampling_params = row.pop("sampling_params")
             if "guided_decoding" in sampling_params:
-                guided_decoding = vllm.sampling_params.GuidedDecodingParams(
+                guided_decoding = vllm.sampling_params.StructuredOutputsParams(
                     **maybe_convert_ndarray_to_list(
                         sampling_params.pop("guided_decoding")
                     )
@@ -285,7 +285,7 @@ class vLLMEngineWrapper:
                 guided_decoding = None
             params = vllm.SamplingParams(
                 **maybe_convert_ndarray_to_list(sampling_params),
-                guided_decoding=guided_decoding,
+                structured_outputs=guided_decoding,
             )
         elif self.task_type == vLLMTaskType.EMBED:
             params = vllm.PoolingParams(task=self.task_type.value)
