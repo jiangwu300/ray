@@ -245,6 +245,8 @@ class vLLMEngineWrapper:
 
         # Convert the task type back to a string to pass to the engine.
         kwargs["task"] = self.task_type.value
+        kwargs["runner"] = kwargs["task"]
+        del kwargs["task"]
 
         try:
             import vllm
