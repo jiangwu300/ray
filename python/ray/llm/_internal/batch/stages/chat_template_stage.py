@@ -44,7 +44,7 @@ class ChatTemplateUDF(StatefulStageUDF):
         model_path = download_model_files(
             model_id=model,
             mirror_config=None,
-            download_model=NodeModelDownloadable.TOKENIZER_ONLY,
+            download_model=NodeModelDownloadable.EXCLUDE_SAFETENSORS,
             download_extra_files=False,
         )
         if TYPE_CHECKING:
