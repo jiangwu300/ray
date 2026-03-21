@@ -26,7 +26,7 @@ class TokenizeUDF(StatefulStageUDF):
         Args:
             data_column: The data column name.
             expected_input_keys: The expected input keys of the stage.
-            model: The model to use for the chat template.
+            model: The model to use for tokenization.
         """
         from transformers import AutoTokenizer
 
@@ -34,7 +34,7 @@ class TokenizeUDF(StatefulStageUDF):
         model_path = download_model_files(
             model_id=model,
             mirror_config=None,
-            download_model=NodeModelDownloadable.TOKENIZER_ONLY,
+            download_model=NodeModelDownloadable.EXCLUDE_SAFETENSORS,
             download_extra_files=False,
         )
         self.tokenizer = get_cached_tokenizer(
@@ -89,7 +89,7 @@ class DetokenizeUDF(StatefulStageUDF):
         Args:
             data_column: The data column name.
             expected_input_keys: The expected input keys of the stage.
-            model: The model to use for the chat template.
+            model: The model to use for detokenization.
         """
         from transformers import AutoTokenizer
 
@@ -115,7 +115,7 @@ class DetokenizeUDF(StatefulStageUDF):
             batch: A list of rows to send.
 
         Yields:
-            A generator of rows with the detokenized prompt.
+            A generator of rows with the detokenized generated text.
         """
         for row, generated_text in zip(
             batch,
