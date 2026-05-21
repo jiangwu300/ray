@@ -107,13 +107,7 @@ def _hash_partition(
     table: "pyarrow.Table",
     num_partitions: int,
 ) -> np.ndarray:
-    # NOTE: We special-case single column with integer type,
-    #       short-circuiting the need for hashing the column and instead
-    #       using values as-is for partitioning.
-    if len(table.columns) == 1 and pyarrow.types.is_integer(table.column(0).type):
-        target_column = table.column(0)
-        partitions = (target_column.to_numpy() % num_partitions).astype(np.int64)
-    elif _has_unhashable_pandas_types(table.schema):
+    if _has_unhashable_pandas_types(table.schema):
         # Struct/list/map columns become dicts/lists in pandas, which are
         # unhashable. Use row-by-row hashing on PyArrow scalars instead.
         partitions = np.zeros((table.num_rows,), dtype=np.int64)
@@ -131,8 +125,9 @@ def _hash_partition(
         # blocks depending on whether the block contains nulls.
         hashes = pd.util.hash_pandas_object(
             table.to_pandas(types_mapper=pd.ArrowDtype), index=False
-        ).to_numpy()
-        partitions = hashes % num_partitions
+        ).values
+        np.mod(hashes, num_partitions, out=hashes)
+        partitions = hashes
 
     return partitions
 
